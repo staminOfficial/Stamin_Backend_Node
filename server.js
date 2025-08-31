@@ -1,18 +1,16 @@
 // server.js
-const express = require('express');
 const dotenv = require('dotenv');
-const aiRoutes = require('./routes/aiRoutes');
-
 dotenv.config();
 
-const app = express();
-app.use(express.json());
+const connectDB = require("./db");
+const app = require("./app");
+// const aiRoutes = require('./routes/aiRoutes');
+
+connectDB();
 
 // Health check
 app.get('/', (req, res) => res.send('Node API is running'));
 
-// Register AI route
-app.use('/api/ai', aiRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 //Function to get the curretn date with a 5:30 (330 minities) offset
-const getIsDate = () => {
+const getISTDate = () => {
     const now = new Date();
     return new Date(now.getTime() + 330 * 60 * 1000); // Add 330 minitues in milliseconds
 };
@@ -14,7 +14,7 @@ const otpSchema = new mongoose.Schema({
         // required: [true. "User ID required"],
     },
     tempUserId: {
-        type: mongoose.Schema.Typed.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "TempUser",
     },
     otp: {

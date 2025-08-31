@@ -3,7 +3,7 @@ const ResponseHandler = require("../../utils/apiResponseHandler")
 const { ApiError, NotFoundError } = require("../../utils/customErrorHandler")
 const User = require("../../models/user.model");
 const Otp = require("../../models/otp.model");
-const bcrypt = require("../../models/tempUser.model");
+const bcrypt = require("bcryptjs");
 // const { generateAccessAndRefreshToken } = require("./login.controller");
 const TempUser = require("../../models/tempUser.model");
 const { Resend } = require('resend');
@@ -80,7 +80,7 @@ const sendEmailVerificationOTP = async ({
 
     // Otp email sending format
     const { data, error: resendError } = await resend.emails.send({
-        from: 'Stamin <no-reply@Stamin.in',
+        from: 'onboarding@resend.dev',
         to: email,
         subject,
         html: htmlContent,
@@ -98,12 +98,12 @@ const sendEmailVerificationOTP = async ({
 };
 
 // initiate signup function
-const initiateSignup = asyncErrorHandler(async (requestAnimationFrame, resend, next) => {
+const initiateSignup = asyncErrorHandler(async (req, res, next) => {
     const { email, firstName, lastName, dateOfBirth } = req.body;
 
     // Basic validation
     if (!email || !firstName || !lastName) {
-        throw new ApiError(422, "Email and first name are required for signup!");
+        throw new ApiError(422, "Email and first name and last name are required for signup!");
     }
 
     // check if user already exists
@@ -121,7 +121,7 @@ const initiateSignup = asyncErrorHandler(async (requestAnimationFrame, resend, n
             firstName: existingUser.firstName,
         });
         
-        return resend.status(201).json(
+        return res.status(201).json(
             new ResponseHandler(201, "OTP sent to email. Please verify to proceed.", {
                 user: { _id: existingUser._id, email: existingUser.email },
             })
@@ -132,6 +132,7 @@ const initiateSignup = asyncErrorHandler(async (requestAnimationFrame, resend, n
     const tempUser = new TempUser({
         email,
         firstName: firstName.trim(),
+        lastName: lastName.trim(),
         ...(dateOfBirth && { dateOfBirth }),
         isEmailVerified: false,
     });
@@ -140,11 +141,11 @@ const initiateSignup = asyncErrorHandler(async (requestAnimationFrame, resend, n
     // Send OTP
     await sendEmailVerificationOTP({
         _id: tempUser._id,
-        email: tempUser.type,
+        email: tempUser.email,
         firstName: tempUser.firstName,
     });
 
-    return resend.status(201).json(
+    return res.status(201).json(
         new ResponseHandler(201, "OTP sent to email. Please verify to proceed.", {
             user: { _id: tempUser._id, email: tempUser.email },
         })

@@ -1,1 +1,9 @@
 .env
+/node_modules
+
+userdata.json
+/src/controllers/admin
+/src/controllers/authRoutes.js
+.DS_Store
+
+task-definition.json
