@@ -4,7 +4,7 @@ const { ApiError, NotFoundError } = require("../../utils/customErrorHandler")
 const User = require("../../models/user.model");
 const Otp = require("../../models/otp.model");
 const bcrypt = require("bcryptjs");
-// const { generateAccessAndRefreshToken } = require("./login.controller");
+const { generateAccessAndRefreshToken } = require("./login.controller");
 const TempUser = require("../../models/tempUser.model");
 const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -163,13 +163,12 @@ const verifyOtp = asyncErrorHandler(async (req, res, next) => {
 
   //Fetch OTP from DB
   const otpRecord = await Otp.findOne({ tempUserId: _id }).sort({
-    createAt: -1,
+    createdAt: -1,
   });
 
   const now = new Date();
-  const localTime = new Date(now.getTime() + 330*60*1000);
 
-  if(!otpRecord || otpRecord.expiresAt < localTime) {
+  if(!otpRecord || otpRecord.expiresAt < now) {
     await Otp.deleteMany({ tempUserId: _id });
     throw new ApiError(400, "Invalid or expired OTP!");
   }
@@ -219,9 +218,80 @@ const resendOtp = asyncErrorHandler(async (req, res, next) => {
     );
 });
 
+
+// complete creating account
+const completeSignup = asyncErrorHandler(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password ) {
+    throw new ApiError(
+      422,
+      "All fields, including location coordinates, are required to complete profile!"
+    );
+  }
+  console.log("Complete signup called with email:", email);
+
+  const tempUser = await TempUser.findOne({
+    email,
+    isEmailVerified: true,
+  }).sort({ createdAt: -1 });
+  console.log(tempUser);
+  if (!tempUser) {
+    throw new ApiError(404, "User not found or not verified!");
+  }
+
+  const tempUserData = tempUser.toObject();
+  delete tempUserData._id;
+  delete tempUserData.createdAt;
+  delete tempUserData.updatedAt;
+
+  // Create a new user
+  const user = new User({
+    ...tempUserData,
+    password,
+  });
+
+  // Save user data
+  await user.save();
+
+  // Generate tokens
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  // Delete the particular temp user
+  await TempUser.deleteOne({ _id: tempUser._id });
+
+  return res.status(200).json(
+    new ResponseHandler(
+      200,
+      "Profile completed! Account created successfully.",
+      {
+        accessToken,
+        refreshToken,
+        user: {
+          _id: user._id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          headline: user.headline,
+          dateOfBirth: user.dateOfBirth,
+          age: user.age,
+          address: user.address,
+          isEmailVerified: user.isEmailVerified,
+          isProfileComplete: user.isProfileComplete,
+          isWatchConnected: user.isWatchConnected
+        },
+      }
+    )
+  );
+});
+
 module.exports = {
     initiateSignup,
     verifyOtp,
-    resendOtp
+    resendOtp,
+    completeSignup
 }
 
