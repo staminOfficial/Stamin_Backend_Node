@@ -153,7 +153,75 @@ const initiateSignup = asyncErrorHandler(async (req, res, next) => {
 
 });
 
+// verify otp
+const verifyOtp = asyncErrorHandler(async (req, res, next) => {
+  const {_id,otp} = req.body;
+
+  if(!_id || !otp) {
+    throw new ApiError(422, "User ID and OTP are required");
+  }
+
+  //Fetch OTP from DB
+  const otpRecord = await Otp.findOne({ tempUserId: _id }).sort({
+    createAt: -1,
+  });
+
+  const now = new Date();
+  const localTime = new Date(now.getTime() + 330*60*1000);
+
+  if(!otpRecord || otpRecord.expiresAt < localTime) {
+    await Otp.deleteMany({ tempUserId: _id });
+    throw new ApiError(400, "Invalid or expired OTP!");
+  }
+
+    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
+  if (!isMatch) {
+    throw new ApiError(400, "Incorrect OTP!");
+  }
+  try {
+    // Mark user as verified
+    const user = await TempUser.findById(_id);
+
+    user.isEmailVerified = true;
+    await user.save();
+
+    await Otp.deleteMany({ tempUserId: _id }); // Clean up used OTP
+
+    return res
+      .status(200)
+      .json(new ResponseHandler(200, "Email verified! Complete your profile."));
+  } catch (error) {
+    console.log("Otp verifying failed", error);
+    throw new ApiError(500, "An error occurred while verifying the otp");
+  }
+});
+
+//resend otp
+const resendOtp = asyncErrorHandler(async (req, res, next) => {
+  const { _id, email } = req.body;
+
+  const user = await TempUser.findById(_id);
+
+  if (!user) {
+    throw new NotFoundError("User not found !");
+  }
+
+  // Send OTP
+  await sendEmailVerificationOTP({ _id, email });
+
+  return res
+    .status(201)
+    .json(
+      new ResponseHandler(
+        201,
+        "OTP sent to email again. Please verify to proceed."
+      )
+    );
+});
+
 module.exports = {
     initiateSignup,
+    verifyOtp,
+    resendOtp
 }
 
