@@ -11,23 +11,23 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // SEND otp to email function
 const sendEmailVerificationOTP = async ({
-    _id,
-    email,
-    firstName,
-    lastName,
-    forPasswordReset = false,
+  _id,
+  email,
+  firstName,
+  lastName,
+  forPasswordReset = false,
 }) => {
-   try {
-     // Generate OTP
+  try {
+    // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate a 6-digit OTP
     const now = new Date();
     const expireAt = new Date(now.getTime() + 332 * 60 * 1000); // OTP expires in 10 minitues
 
     // Save OTP in the database
     const newOtp = new Otp({
-        [forPasswordReset ? "userId" : "tempUserId"]: _id,
-        otp,
-        expiresAt: expireAt,
+      [forPasswordReset ? "userId" : "tempUserId"]: _id,
+      otp,
+      expiresAt: expireAt,
     });
     await newOtp.save();
 
@@ -35,7 +35,7 @@ const sendEmailVerificationOTP = async ({
     const subject = forPasswordReset ? "Password Reset Verification" : "Email Verification";
     const text = `Your Verification Code is ${otp}`;
     const htmlContent = forPasswordReset
-        ? `
+      ? `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; overflow: hidden;">
         <div style="background-color: #000000; color: white; padding: 16px; text-align: center; font-size: 24px;">
           Password Reset
@@ -56,7 +56,7 @@ const sendEmailVerificationOTP = async ({
         </div>
       </div>
     `
-        : `
+      : `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; overflow: hidden;">
         <div style="background-color: #000000; color: white; padding: 16px; text-align: center; font-size: 24px;">
           Email Verification
@@ -80,84 +80,84 @@ const sendEmailVerificationOTP = async ({
 
     // Otp email sending format
     const { data, error: resendError } = await resend.emails.send({
-        from: 'onboarding@resend.dev',
-        to: email,
-        subject,
-        html: htmlContent,
+      from: 'onboarding@resend.dev',
+      to: email,
+      subject,
+      html: htmlContent,
     });
 
     if (resendError) {
-        console.error(resendError);
-        throw new ApiError(500, "Failed to send OTP !");
+      console.error(resendError);
+      throw new ApiError(500, "Failed to send OTP !");
     }
     console.log("OTP sent successfully !");
-   } catch (error) {
+  } catch (error) {
     console.log(error);
     throw new ApiError(500, "Something went wrong ! Resend OTP !");
-   }
+  }
 };
 
 // initiate signup function
 const initiateSignup = asyncErrorHandler(async (req, res, next) => {
-    const { email, firstName, lastName, dateOfBirth } = req.body;
+  const { email, firstName, lastName, dateOfBirth } = req.body;
 
-    // Basic validation
-    if (!email || !firstName || !lastName) {
-        throw new ApiError(422, "Email and first name and last name are required for signup!");
-    }
+  // Basic validation
+  if (!email || !firstName || !lastName) {
+    throw new ApiError(422, "Email and first name and last name are required for signup!");
+  }
 
-    // check if user already exists
-    const existingUser = await User.findOne({ email }).select(
-        "_id email isEmailVerified firstName"
-    );
+  // check if user already exists
+  const existingUser = await User.findOne({ email }).select(
+    "_id email isEmailVerified firstName"
+  );
 
-    if (existingUser && existingUser.isEmailVerified) {
-        throw new ApiError(409, "Email already in use!");
-    } else if (existingUser && !existingUser.isEmailVerified) {
-        //Send OTP for verification
-        await sendEmailVerificationOTP({
-            _id: existingUser._id,
-            email: existingUser.email,
-            firstName: existingUser.firstName,
-        });
-        
-        return res.status(201).json(
-            new ResponseHandler(201, "OTP sent to email. Please verify to proceed.", {
-                user: { _id: existingUser._id, email: existingUser.email },
-            })
-        );
-    }
-
-    //Create a temporary user
-    const tempUser = new TempUser({
-        email,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        ...(dateOfBirth && { dateOfBirth }),
-        isEmailVerified: false,
-    });
-    await tempUser.save();
-
-    // Send OTP
+  if (existingUser && existingUser.isEmailVerified) {
+    throw new ApiError(409, "Email already in use!");
+  } else if (existingUser && !existingUser.isEmailVerified) {
+    //Send OTP for verification
     await sendEmailVerificationOTP({
-        _id: tempUser._id,
-        email: tempUser.email,
-        firstName: tempUser.firstName,
+      _id: existingUser._id,
+      email: existingUser.email,
+      firstName: existingUser.firstName,
     });
 
     return res.status(201).json(
-        new ResponseHandler(201, "OTP sent to email. Please verify to proceed.", {
-            user: { _id: tempUser._id, email: tempUser.email },
-        })
+      new ResponseHandler(201, "OTP sent to email. Please verify to proceed.", {
+        user: { _id: existingUser._id, email: existingUser.email },
+      })
     );
+  }
+
+  //Create a temporary user
+  const tempUser = new TempUser({
+    email,
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
+    ...(dateOfBirth && { dateOfBirth }),
+    isEmailVerified: false,
+  });
+  await tempUser.save();
+
+  // Send OTP
+  await sendEmailVerificationOTP({
+    _id: tempUser._id,
+    email: tempUser.email,
+    firstName: tempUser.firstName,
+  });
+
+  return res.status(201).json(
+    new ResponseHandler(201, "OTP sent to email. Please verify to proceed.", {
+      user: { _id: tempUser._id, email: tempUser.email },
+    })
+  );
 
 });
 
 // verify otp
 const verifyOtp = asyncErrorHandler(async (req, res, next) => {
-  const {_id,otp} = req.body;
+  const { _id, otp } = req.body;
 
-  if(!_id || !otp) {
+  if (!_id || !otp) {
     throw new ApiError(422, "User ID and OTP are required");
   }
 
@@ -168,12 +168,12 @@ const verifyOtp = asyncErrorHandler(async (req, res, next) => {
 
   const now = new Date();
 
-  if(!otpRecord || otpRecord.expiresAt < now) {
+  if (!otpRecord || otpRecord.expiresAt < now) {
     await Otp.deleteMany({ tempUserId: _id });
     throw new ApiError(400, "Invalid or expired OTP!");
   }
 
-    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
+  const isMatch = await bcrypt.compare(otp, otpRecord.otp);
   if (!isMatch) {
     throw new ApiError(400, "Incorrect OTP!");
   }
@@ -223,7 +223,7 @@ const resendOtp = asyncErrorHandler(async (req, res, next) => {
 const completeSignup = asyncErrorHandler(async (req, res, next) => {
   const { email, password } = req.body;
 
-  if (!email || !password ) {
+  if (!email || !password) {
     throw new ApiError(
       422,
       "All fields, including location coordinates, are required to complete profile!"
@@ -238,6 +238,11 @@ const completeSignup = asyncErrorHandler(async (req, res, next) => {
   console.log(tempUser);
   if (!tempUser) {
     throw new ApiError(404, "User not found or not verified!");
+  }
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new ApiError(400, "User already exists");
   }
 
   const tempUserData = tempUser.toObject();
@@ -289,9 +294,9 @@ const completeSignup = asyncErrorHandler(async (req, res, next) => {
 });
 
 module.exports = {
-    initiateSignup,
-    verifyOtp,
-    resendOtp,
-    completeSignup
+  initiateSignup,
+  verifyOtp,
+  resendOtp,
+  completeSignup
 }
 
