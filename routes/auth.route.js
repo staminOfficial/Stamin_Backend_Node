@@ -5,7 +5,14 @@ const {
     resendOtp,
     completeSignup
 } = require("../controllers/auth/signup.controller");
+const {
+    userLogin
+}
+= require("../controllers/auth/login.controller")
 const Router = express.Router();
+
+//login routes
+Router.route("/login").post(userLogin);
 
 //signup routes
 Router.route("/initiate-signup").post(initiateSignup);

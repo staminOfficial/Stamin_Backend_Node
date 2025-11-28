@@ -10,38 +10,50 @@ const getISTDate = () => {
 };
 
 const userSchema = new mongoose.Schema(
-    {
-        id: { type: String, default: () => uuidv4() },
-        firstName: { type: String, required: true },
-        lastName: { type: String, required: true },
-        email: { type: String, required: true, unique: true },
-        username: { type: String },
-        isEmailVerified: { type: Boolean, default: false },
-        password: { type: String },
-        profilePic: { type: String },
-        coverPic: { type: String },
-        headline: {
-            type: String,
-            required: true,
-            default: "Hey! I am on Stamin",
-        },
-        dateOfBirth: { type: Date, required: true },
-        address: {
-            city: String,
-            state: String,
-            country: String,
-            location: {
-                type: { type: String, enum: ["Point"], default: "Point" },
-                coordinates: { type: [Number], default: [0,0] },
-            },
-        },
-        refreshToken: {
-            type: String,
-        },
-        isProfileComplete: { type: Boolean, default: false },
-        isWatchConnected: { type: Boolean, default: false },
-    }
+  {
+    id: { type: String, default: () => uuidv4() },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    username: { type: String },
+    isEmailVerified: { type: Boolean, default: false },
+    password: { type: String },
+    profilePic: { type: String },
+    coverPic: { type: String },
+    headline: {
+      type: String,
+      required: true,
+      default: "Hey! I am on Stamin",
+    },
+    dateOfBirth: { type: Date, required: true },
+    address: {
+      city: String,
+      state: String,
+      country: String,
+      location: {
+        type: { type: String, enum: ["Point"], default: "Point" },
+        coordinates: { type: [Number], default: [0, 0] },
+      },
+    },
+    refreshToken: {
+      type: String,
+    },
+    isProfileComplete: { type: Boolean, default: false },
+    isWatchConnected: { type: Boolean, default: false },
+  }
 );
+
+userSchema.pre("save", async function(next) {
+  if (!this.isModified("password")) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// Compare plain password with hashed password
+userSchema.methods.isValidPassword = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
 
 // 🔑 Add token generation methods
 userSchema.methods.generateAccessToken = function () {
